@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简网址导航</title>
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src='js/Sortable.min.js'></script>
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, 0.25);
+            --glass-hover: rgba(255, 255, 255, 0.45);
+            --panel-bg: rgba(255, 255, 255, 0.9); 
+            --accent: #6c5ce7;
+            --text-dark: #2d3436;
+            --shadow: 0 10px 30px rgba(0,0,0,0.25);
+            /* 设定基准宽度以配合缩放 */
+            --base-width: 1200px; 
+        }
+
+        body {
+            margin: 0; 
+            height: 100vh; 
+            width: 100vw;
+            background: #2c3e50 no-repeat center center/cover;
+            background-attachment: fixed;
+            font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;     
+            overflow: hidden; 
+            user-select: none;
+        }
+
+        /* 1. 缩放容器：强制居中 */
+        #zoomWrapper {
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            justify-content: center;
+            width: var(--base-width); /* 固定基准宽度 */
+            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* 4. 搜索框优化 */
+        .search-section { 
+            width: 700px; /* 搜索框容器宽度 */
+            z-index: 2000; 
+            margin-bottom: 60px; 
+            position: relative; 
+        }
+        
+        .search-container {
+            display: flex; 
+            background: rgba(255,255,255,0.95); 
+            border-radius: 35px; 
+            padding: 6px; /* 搜索框外框高度 */
+            box-shadow: var(--shadow); 
+            align-items: center; 
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s;
+        }
+        .search-container:hover { transform: scale(1.02); }
+        
+        .engine-select { 
+            border: none; 
+            background: rgba(0,0,0,0.06); 
+            padding: 10px 15px; 
+            border-radius: 25px; 
+            margin-right: 12px; 
+            cursor: pointer; 
+            outline: none; 
+            font-weight: bold;
+            color: #444;
+            width: 140px; /* 控制搜索框下拉框宽度 */
+            text-align-last: center; 
+            font-size: 14px;
+            -webkit-appearance: none;
+        }
+        .engine-select:hover { background: rgba(0,0,0,0.1); }
+        .engine-select option { text-align: left; padding: 5px; }
+
+        .search-container input { 
+            flex: 1; 
+            border: none; 
+            background: transparent; 
+            padding: 8px; /* 搜索框内部输入框高度 */
+            font-size: 12px; /* 字体大小 */
+            outline: none; 
+            color: #333;
+        }
+
+        #searchHints {
+            position: absolute; top: 115%; left: 0; width: 100%;
+            background: var(--panel-bg); backdrop-filter: blur(20px);
+            border-radius: 20px; 
+            box-shadow: var(--shadow);
+            display: none; 
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px; padding: 15px; box-sizing: border-box;
+            max-height: 400px; overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        /* 3. 主网格：严格的一行10个 */
+        .main-grid {
+            display: grid; 
+            /* 强制10列，每列等宽 */
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 30px 20px; /* 行间距30，列间距20 */
+            padding: 20px; 
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .main-grid > * {
+            min-width: 0;
+        }
+
+        /* 7. 分组节点交互 */
+        .node-item { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            cursor: pointer; 
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
+            position: relative;
+        }
+        .node-item:hover { transform: translateY(-10px); z-index: 10; }
+        
+        .icon-sphere {
+            width: 85px; height: 85px; /* 图标大小 */
+            background: var(--glass);
+            backdrop-filter: blur(12px); 
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid rgba(255,255,255,0.5); 
+            overflow: hidden; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            transition: all 0.3s;
+        }
+        .node-item:hover .icon-sphere {
+            background: var(--glass-hover);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+            border-color: #fff;
+        }
+
+        .icon-sphere img { 
+            width: 100%; height: 100%; /* 图片填充比例 */
+            object-fit: cover; 
+            display: block;
+        }
+        
+        /* 九宫格预览 */
+        .preview-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(3, 1fr);
+            width: 96%; height: 96%; 
+            gap: 1px; padding: 12px; box-sizing: border-box;
+        }
+        .preview-grid img { 
+            width: 100%; height: 100%; 
+            border-radius: 30%; 
+            object-fit: cover;
+        }
+        
+        .label-text { 
+            margin-top: 15px; 
+            color: white; 
+            font-size: 12px; /* 分组名称文字大小 */
+            font-weight: 600; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.7); 
+            text-align: center;
+            max-width: 110px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* 2. 弹窗防止溢出 */
+        #popover {
+            position: fixed; 
+            background: var(--panel-bg); 
+            backdrop-filter: blur(30px) saturate(180%);
+            border-radius: 24px; 
+            box-shadow: 0 30px 70px rgba(0,0,0,0.5); 
+            z-index: 3000; 
+            display: none; 
+            width: 540px; 
+            max-width: calc(100vw - 32px); /* ★ 新增，防极窄屏 */
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.7); 
+            box-sizing: border-box;
+            opacity: 0; transition: opacity 0.2s;
+        }
+        
+        .pop-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; padding-bottom: 10px; 
+            border-bottom: 1px solid rgba(0,0,0,0.1); 
+        }
+        .pop-title { font-size: 20px; font-weight: 800; color: var(--text-dark); }
+        
+        .pop-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); 
+            gap: 20px; 
+            max-height: 50vh; overflow-y: auto; 
+            padding: 5px; 
+        }
+        .pop-grid::-webkit-scrollbar { width: 5px; }
+        .pop-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+
+        .pop-link { 
+            display: flex; flex-direction: column; align-items: center; 
+            text-decoration: none; color: var(--text-dark); 
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .pop-link:hover { transform: translateY(-4px); }
+
+        .pop-icon-box {
+            width: 64px; height: 64px; 
+            background: #fff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 8px; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08); 
+            overflow: hidden; border: 2px solid #fff;
+        }
+        .pop-icon-box img { width: 100%; height: 100%; object-fit: cover; }
+        .pop-text { font-size: 13px; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+
+        /* 右键菜单 */
+        #contextMenu {
+            position: fixed; display: none; z-index: 9999; 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+            padding: 8px 0; min-width: 160px;
+            border: 1px solid rgba(255,255,255,0.6);
+            animation: fadeIn 0.1s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        .menu-item {
+            padding: 10px 20px; font-size: 14px; cursor: pointer; 
+            display: flex; align-items: center; gap: 10px; color: #333;
+            transition: 0.1s;
+        }
+        .menu-item:hover { background: var(--accent); color: white; }
+        .menu-separator { height: 1px; background: #eee; margin: 4px 0; }
+
+        /* 工具栏 */
+        .tools { position: fixed; bottom: 30px; right: 30px; display: flex; gap: 15px; z-index: 4000; }
+        .btn-round { 
+            width: 50px; height: 50px; border-radius: 50%; border: none; 
+            background: rgba(255,255,255,0.2); color: white; cursor: pointer; 
+            backdrop-filter: blur(10px); 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 22px; transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .btn-round:hover { background: var(--accent); transform: translateY(-5px); box-shadow: 0 10px 25px rgba(108, 92, 231, 0.5); }
+        
+        /* 提示 */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
+            border-radius: 50px; font-size: 14px; z-index: 5000;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="zoomWrapper">
+        <div class="search-section">
+            <div class="search-container">
+                <select class="engine-select" id="engineSelect">
+                    <option value="https://www.google.com/search?q=">Google</option>
+                    <option value="https://translate.google.com/?sl=auto&tl=zh-CN&text=">Google 翻译</option>
+                    <option value="https://www.bing.com/search?q=">Bing</option>
+                    <option value="https://yandex.com/search/?text=">Yandex</option>
+                    <option value="https://duckduckgo.com/?q=">DuckDuckGo</option>
+                </select>
+                <input type="text" id="searchInput" placeholder="搜索网络或书签..." autocomplete="off">
+            </div>
+            <div id="searchHints"></div>
+        </div>
+        <div class="main-grid" id="mainGrid"></div>
+    </div>
+
+    <div id="popover">
+        <div class="pop-header">
+            <span class="pop-title" id="popTitle">分组名称</span>
+            <div style="font-size:12px; color:#888; background:#eee; padding:4px 10px; border-radius:10px;">
+                Tip: 右键图标可修改
+            </div>
+        </div>
+        <div class="pop-grid" id="popGrid"></div>
+    </div>
+
+    <div id="contextMenu">
+        <div class="menu-item" onclick="handleMenuAction('edit')">✏️ 修改信息</div>
+        <div class="menu-item" onclick="handleMenuAction('icon')">🖼️ 更换图标</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" onclick="handleMenuAction('delete')" style="color:#e74c3c;">🗑️ 删除此项</div>
+    </div>
+
+    <div class="tools">
+        <button class="btn-round" onclick="document.getElementById('fileInput').click()" title="导入Chrome书签">🔖</button>
+        <button class="btn-round" onclick="exportConfig()" title="导出配置">📤</button>
+        <button class="btn-round" onclick="document.getElementById('configInput').click()" title="导入配置">📥</button>
+        <button class="btn-round" onclick="document.getElementById('bgInput').click()" title="更换壁纸">🎨</button>
+        <button class="btn-round" onclick="openAddLinkPopup()" title="添加网址">➕</button>
+    </div>
+    
+    <div class="toast" id="toast">操作成功</div>
+
+    <input type="file" id="fileInput" accept=".html" style="display:none">
+    <input type="file" id="configInput" accept=".json" style="display:none">
+    <input type="file" id="bgInput" accept="image/*" style="display:none">
+    <input type="file" id="iconInput" accept="image/*" style="display:none">
+    
+    <div id="addLinkPopover" style="display:none; position:fixed; z-index:5000; 
+        background: var(--panel-bg); backdrop-filter: blur(20px); padding:20px; border-radius:20px; 
+        box-shadow: var(--shadow); width: 400px; max-width: 90vw;">
+        <div style="margin-bottom:10px; font-weight:bold; font-size:16px;">添加新网址</div>
+        <input type="text" id="newLinkName" placeholder="名称" style="width:100%; margin-bottom:10px; padding:8px; border-radius:8px; border:1px solid #ccc;">
+        <input type="text" id="newLinkURL" placeholder="网址 (含 https://)" style="width:100%; margin-bottom:10px; padding:8px; border-radius:8px; border:1px solid #ccc;">
+    
+        <select id="groupSelect" style="width:100%; padding:8px; border-radius:8px; border:1px solid #ccc; margin-bottom:10px;">
+            <!-- 这里会动态生成选项，包括“新建分组” -->
+        </select>
+    
+        <input type="text" id="newGroupName" placeholder="新建分组名称（仅在选择新建时填写）" style="width:100%; margin-bottom:10px; padding:8px; border-radius:8px; border:1px solid #ccc; display:none;">
+    
+        <div style="text-align:right;">
+            <button onclick="closeAddLinkPopup()" style="margin-right:10px;">取消</button>
+            <button onclick="addLinkToGroup()">添加</button>
+        </div>
+    </div>
+
+<script>
+    // --- 核心数据结构 ---
+    let bData = [];
+    
+    // --- 运行时状态 ---
+    let activeGroupIdx = -1;  // 当前操作的分组索引
+    let activeLinkIdx = -1;   // 当前操作的链接索引 (如果是分组操作则为-1)
+    let contextTargetType = ''; // 'group' 或 'link'
+    let closeTimer = null;
+    let showTimer = null; // 用于控制延迟显示的计时器
+    let isDragging = false; // 拖拽状态锁
+    let isMenuOpen = false;   // 阻止弹窗关闭的关键锁
+
+    // --- DOM 引用 ---
+    const els = {
+        popover: document.getElementById('popover'),
+        mainGrid: document.getElementById('mainGrid'),
+        zoomWrapper: document.getElementById('zoomWrapper'),
+        contextMenu: document.getElementById('contextMenu'),
+        searchInput: document.getElementById('searchInput'),
+        searchHints: document.getElementById('searchHints'),
+        engineSelect: document.getElementById('engineSelect'),
+        toast: document.getElementById('toast')
+    };
+
+    // --- 初始化 ---
+    window.onload = async () => {
+        // 1. 尝试加载背景图
+        tryLoadBackground();
+        
+        // 2. 核心数据加载逻辑：JSON > HTML > LocalStorage
+        await initDataPipeline();
+
+        // 3. 渲染与缩放
+        renderMain();
+        handleZoom();
+        
+        // 4. 绑定全局事件
+        window.addEventListener('resize', handleZoom);
+        document.addEventListener('click', (e) => {
+            // 点击任意处关闭右键菜单
+            if (!els.contextMenu.contains(e.target)) {
+                els.contextMenu.style.display = 'none';
+                isMenuOpen = false;
+                
+                // 如果点击的也不是popover，也不是分组图标，则关闭popover
+                if (!els.popover.contains(e.target) && !e.target.closest('.group-node')) {
+                    hidePopoverNow();
+                }
+            }
+        });
+        
+        // 拖拽初始化
+        new Sortable(els.mainGrid, {
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            draggable: ".group-node", // 明确指定可拖拽的元素类名
+            delay: 50, // 按下 50ms 后才开始识别为拖拽，这给“快速点击”留出了空间
+            delayOnTouchOnly: false,
+            swapThreshold: 0.65,
+            // 开始拖拽时清除计时器并上锁
+            onStart: () => {
+                isDragging = true;
+                clearTimeout(showTimer); 
+                hidePopoverNow(); // 如果弹窗已经开了，强制关闭
+            },
+            // 拖拽结束时解锁
+            onEnd: (evt) => {
+                // 拖拽结束后，稍等一下再解锁 isDragging
+                // 这样可以防止松开鼠标的那一瞬间误触发 onclick
+                setTimeout(() => { 
+                    isDragging = false; 
+                    updateOrder(); // 调用更新排序逻辑
+                }, 100);
+            }
+        });
+    };
+
+    // --- 1. 自适应缩放逻辑 (Point 1) ---
+    function handleZoom() {
+        // 基准宽度 1200px (对应8列 + 间隙)
+        const baseW = 1200; 
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        
+        // 计算宽缩放比和高缩放比
+        // 预留一些边距 (width * 0.9)
+        const scaleX = (winW * 0.95) / baseW;
+        // 假设高度基准是 800px
+        const scaleY = (winH * 0.9) / 800; 
+        
+        // 取较小值以保证完全可见
+        let scale = Math.min(scaleX, scaleY);
+        // 限制缩放范围，防止过大或过小
+        scale = Math.max(0.5, Math.min(scale, 1.2));
+        
+        els.zoomWrapper.style.transform = `scale(${scale})`;
+    }
+
+    // --- 渲染逻辑 ---
+    function renderMain() {
+        els.mainGrid.innerHTML = '';
+        bData.forEach((g, idx) => {
+            const node = document.createElement('div');
+            // 确保类名包含 group-node 供 Sortable 识别
+            node.className = 'node-item group-node';
+            node.setAttribute('data-idx', idx); // 增加索引标记
+            
+            // 右键菜单事件 (Point 3)
+            node.oncontextmenu = (e) => openContextMenu(e, 'group', idx);
+            
+            // 处理点击弹出
+            node.onclick = (e) => {
+                // 只有当不是正在拖拽，且没有打开右键菜单时才触发弹出
+                if (isDragging || isMenuOpen) return;
+    
+                // 如果弹窗已经开了，且就是当前这个分组，可以考虑切换关闭（可选）
+                if (els.popover.style.display === 'block' && activeGroupIdx === idx) {
+                    hidePopoverNow();
+                } else {
+                    showPopover(e, idx);
+                }
+            };
+            
+            // 悬停显示弹窗
+            node.onmouseenter = (e) => {
+                if (isDragging || isMenuOpen) return; // 如果正在拖拽，或者右键菜单打开，则不触发弹窗计时
+                const target = e.currentTarget; // 必须先捕获目标，因为异步后的 e.currentTarget 会失效
+                clearTimeout(closeTimer); // 取消隐藏计时
+    
+                // 设置延迟 500ms 显示
+                showTimer = setTimeout(() => {
+                    // 再次检查，防止在等待的0.5秒期间开始了拖拽
+                    if (!isDragging) {
+                        showPopover({ currentTarget: target }, idx);
+                    }
+                }, 500);
+            };
+            node.onmouseleave = () => {
+                clearTimeout(showTimer); // ★ 核心：如果鼠标在0.5秒内移开了，就取消弹出
+                tryHidePopover();
+            };
+
+            // 图标渲染：自定义图 or 九宫格
+            let iconContent;
+            if (g.customIcon) {
+                iconContent = `<img src="${g.customIcon}">`;
+            } else {
+                const subLinks = g.links.slice(0, 9);
+                const imgs = subLinks.map(l => `<img src="${l.icon}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23ddd%22><circle cx=%2212%22 cy=%2212%22 r=%2210%22/></svg>'">`).join('');
+                iconContent = `<div class="preview-grid">${imgs}</div>`;
+            }
+
+            node.innerHTML = `
+                <div class="icon-sphere" style="pointer-events: none;">${iconContent}</div>
+                <div class="label-text" style="pointer-events: none;">${g.group}</div>
+            `;
+            // 注意：上面给内部元素加了 pointer-events: none，是为了让点击事件穿透到 node 节点本身，
+            // 这样可以极大提高拖拽和点击的稳定性。
+            els.mainGrid.appendChild(node);
+        });
+    }
+
+    // --- 2. 弹窗逻辑 (Point 2 & 3) ---
+    function showPopover(e, idx) {
+        if (isMenuOpen) return; // 如果正在操作右键菜单，不切换弹窗
+        
+        activeGroupIdx = idx;
+        const g = bData[idx];
+        document.getElementById('popTitle').innerText = g.group; // 更新弹窗标题为当前分组的名称
+        // 兼容性处理：如果是从 onclick 传进来的，目标是 e.currentTarget
+        // 如果是从 setTimeout 传进来的，你之前已经处理了对象包装
+        const targetNode = e.currentTarget; 
+        if (!targetNode) return;
+        
+        // 渲染弹窗内容
+        popGrid.innerHTML = g.links.map((l, lIdx) => `
+            <div class="pop-link" 
+                 oncontextmenu="openContextMenu(event, 'link', ${lIdx})"
+                 onclick="window.open('${l.url}','_blank')">
+                <div class="pop-icon-box">
+                    <img src="${l.icon}" onerror="this.src='https://www.google.com/s2/favicons?sz=64&domain=${l.url}'">
+                </div>
+                <div class="pop-text" title="${l.name}">${l.name}</div>
+            </div>
+        `).join('');
+        // 初始化分组内拖拽
+        new Sortable(document.getElementById('popGrid'), {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            draggable: ".pop-link",     // 明确指定只有链接图标可拖拽
+            delay: 200,                // 必须按住 200ms 才开始拖拽
+            delayOnTouchOnly: true,    // 只在触摸屏上启用延迟，不影响鼠标手感
+            touchStartThreshold: 5,    // 允许 5px 的手指抖动，防止轻微晃动导致点击失效
+            onEnd: (evt) => {
+                const g = bData[activeGroupIdx];
+                // 根据拖拽顺序重新排列 links
+                const newLinks = [];
+                const items = evt.from.children;
+                for (let i = 0; i < items.length; i++) {
+                    const name = items[i].querySelector('.pop-text').innerText;
+                    const link = g.links.find(l => l.name === name);
+                    if (link) newLinks.push(link);
+                }
+                g.links = newLinks;
+                saveData();
+            }
+        });
+
+        // 计算位置
+        const rect = targetNode.getBoundingClientRect(); // 使用 targetNode
+        els.popover.style.display = 'block';
+        els.popover.style.opacity = '0';
+        
+        // 确保弹窗已渲染以获取尺寸
+        requestAnimationFrame(() => {
+            const padding = 16;
+            const pW = els.popover.offsetWidth;
+            const pH = els.popover.offsetHeight;
+            // 理想居中
+            let left = rect.left + rect.width / 2 - pW / 2;
+            let top  = rect.bottom + 15;
+
+            // 横向夹紧（最终）
+            left = Math.max(
+                padding,
+                Math.min(left, window.innerWidth - pW - padding)
+            );
+            // 纵向：下方不够则放上方
+            if (top + pH + padding > window.innerHeight) {
+                top = rect.top - pH - 15;
+            }
+            // ★ 纵向最终夹紧（你之前缺的关键一步）
+            top = Math.max(
+                padding,
+                Math.min(top, window.innerHeight - pH - padding)
+            );
+
+            els.popover.style.left = `${left}px`;
+            els.popover.style.top  = `${top}px`;
+            els.popover.style.opacity = '1';
+        });
+    }
+
+    function tryHidePopover() {
+        // Point 3: 如果菜单打开，绝对不隐藏
+        if (isMenuOpen) return;
+        
+        closeTimer = setTimeout(() => {
+            els.popover.style.opacity = '0';
+            setTimeout(() => {
+                // 双重检查，防止在淡出动画时又移入
+                if (els.popover.style.opacity === '0') els.popover.style.display = 'none';
+            }, 200);
+        }, 300);
+    }
+    
+    function openAddLinkPopup() {
+        const pop = document.getElementById('addLinkPopover');
+        pop.style.display = 'block';
+
+        // 填充分组下拉框
+        const sel = document.getElementById('groupSelect');
+        sel.innerHTML = '';
+        bData.forEach((g, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = g.group;
+            sel.appendChild(opt);
+        });
+        const newOpt = document.createElement('option');
+        newOpt.value = 'new';
+        newOpt.textContent = '新建分组';
+        sel.appendChild(newOpt);
+
+        // 控制新建分组输入框显示
+        sel.onchange = () => {
+            document.getElementById('newGroupName').style.display = sel.value === 'new' ? 'block' : 'none';
+        };
+
+        // 默认隐藏新建分组输入框
+        document.getElementById('newGroupName').style.display = 'none';
+    }
+
+    function closeAddLinkPopup() {
+        const pop = document.getElementById('addLinkPopover');
+        pop.style.display = 'none';
+        document.getElementById('newLinkName').value = '';
+        document.getElementById('newLinkURL').value = '';
+        document.getElementById('newGroupName').value = '';
+    }
+    
+    function addLinkToGroup() {
+        const name = document.getElementById('newLinkName').value.trim();
+        const url = document.getElementById('newLinkURL').value.trim();
+        const groupSel = document.getElementById('groupSelect').value;
+        const newGroupName = document.getElementById('newGroupName').value.trim();
+
+        if(!name || !url) { showToast("名称和网址不能为空"); return; }
+
+        let groupIdx;
+        if(groupSel === 'new') {
+            if(!newGroupName) { showToast("请填写新分组名称"); return; }
+            const newGroup = { group: newGroupName, links: [], customIcon: null };
+            bData.push(newGroup);
+            groupIdx = bData.length - 1;
+        } else {
+            groupIdx = parseInt(groupSel);
+        }
+
+        // 添加链接
+        let icon;
+        try { 
+            const u = new URL(url);
+            icon = `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`;
+        } catch(e) { icon = ''; }
+
+        bData[groupIdx].links.push({ name, url, icon });
+
+        saveData();
+        renderMain();
+        if(activeGroupIdx === groupIdx) refreshPopover(); // 如果弹窗打开，刷新内容
+
+        showToast("添加成功");
+        closeAddLinkPopup();
+    }
+    
+    function hidePopoverNow() {
+        clearTimeout(closeTimer);
+        els.popover.style.display = 'none';
+        els.popover.style.opacity = '0';
+    }
+
+    els.popover.onmouseenter = () => clearTimeout(closeTimer);
+    els.popover.onmouseleave = tryHidePopover;
+
+    // --- 3. 统一右键菜单逻辑 (Point 3) ---
+    function openContextMenu(e, type, idx) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        isMenuOpen = true; // 锁定弹窗不消失
+        contextTargetType = type; // 'group' or 'link'
+        
+        if (type === 'group') {
+            activeGroupIdx = idx;
+            activeLinkIdx = -1;
+        } else {
+            // 在弹窗里的link被点击，activeGroupIdx 已经在 showPopover 时设置好了
+            activeLinkIdx = idx;
+        }
+        
+        // 菜单定位防溢出
+        const menu = els.contextMenu;
+        menu.style.display = 'block';
+        let x = e.clientX;
+        let y = e.clientY;
+        
+        if (x + 160 > window.innerWidth) x -= 160;
+        if (y + 120 > window.innerHeight) y -= 120;
+        
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+    }
+
+    function handleMenuAction(action) {
+        els.contextMenu.style.display = 'none';
+        isMenuOpen = false;
+    
+        if (action === 'edit' || action === 'rename') {
+            if (contextTargetType === 'group') {
+                // 分组只需修改名称
+                const oldName = bData[activeGroupIdx].group;
+                const newGroupName = prompt("请输入新的分组名称:", oldName);
+                if (newGroupName && newGroupName.trim() !== "") {
+                    bData[activeGroupIdx].group = newGroupName.trim();
+                    saveData();
+                    renderMain();
+                }
+            } else {
+                // 链接修改：名称 + 网址
+                const link = bData[activeGroupIdx].links[activeLinkIdx];
+            
+                // 第一步：修改名称
+                const newName = prompt("1/2 修改名称:", link.name);
+                if (newName !== null) { // 用户没点取消
+                
+                    // 第二步：修改网址
+                    const newUrl = prompt("2/2 修改网址:", link.url);
+                    if (newUrl !== null) { // 用户没点取消
+                    
+                        // 更新数据
+                        link.name = newName.trim() || link.name;
+                        link.url = newUrl.trim() || link.url;
+                    
+                        // 核心：如果网址变了，尝试自动更新图标 (可选，建议保留)
+                        if (newUrl.trim() !== "") {
+                            try {
+                                const u = new URL(link.url);
+                                // 只有当用户没有自定义过本地图标时，才自动抓取 Google Favicon
+                                if (!link.icon.startsWith('data:image')) {
+                                    link.icon = `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`;
+                                }
+                            } catch(e) { console.warn("网址格式不正确，无法自动更新图标"); }
+                        }
+
+                        saveData();       // 保存到本地缓存
+                        refreshPopover(); // 刷新当前弹窗内容
+                        showToast("信息修改成功");
+                    }
+                }
+            }
+        }
+        else if (action === 'icon') {
+            // 触发隐藏的文件输入框
+            document.getElementById('iconInput').click();
+        }
+        else if (action === 'delete') {
+            if (confirm("确定删除吗？")) {
+                if (contextTargetType === 'group') {
+                    bData.splice(activeGroupIdx, 1);
+                    hidePopoverNow();
+                    saveData();
+                    renderMain();
+                } else {
+                    bData[activeGroupIdx].links.splice(activeLinkIdx, 1);
+                    saveData();
+                    refreshPopover();
+                }
+            }
+        }
+    }
+
+    // 处理图标上传
+    document.getElementById('iconInput').onchange = (e) => {
+        if (!e.target.files.length) return;
+        const file = e.target.files[0];
+        const maxSize = 30 * 1024; // 图标 30KB 限制
+        // --- 检查图标文件大小 ---
+        if (file.size > maxSize) {
+            alert(`图片太大啦！当前大小：${(file.size / 1024).toFixed(1)}KB，请上传小于 30KB 的图片。`);
+            e.target.value = ''; // 清空选择
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const res = ev.target.result;
+            // 这里的 res 是 Base64 字符串
+            if (contextTargetType === 'group') {
+                bData[activeGroupIdx].customIcon = res;
+                renderMain();
+            } else {
+                bData[activeGroupIdx].links[activeLinkIdx].icon = res;
+                refreshPopover();
+            }
+            saveData();
+            e.target.value = ''; // 重置以便重复触发
+            showToast("图标设置成功");
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    function refreshPopover() {
+        // 重新渲染当前打开的弹窗
+        if (activeGroupIdx > -1) {
+            // 模拟一次事件对象来调用 showPopover 比较麻烦，
+            // 直接更新内容更高效
+            const g = bData[activeGroupIdx];
+            const popGrid = document.getElementById('popGrid');
+            popGrid.innerHTML = g.links.map((l, lIdx) => `
+                <div class="pop-link" 
+                     oncontextmenu="openContextMenu(event, 'link', ${lIdx})"
+                     onclick="window.open('${l.url}','_blank')">
+                    <div class="pop-icon-box">
+                        <img src="${l.icon}">
+                    </div>
+                    <div class="pop-text">${l.name}</div>
+                </div>
+            `).join('');
+            // 初始化拖拽
+            new Sortable(popGrid, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                draggable: ".pop-link",     // 明确指定只有链接图标可拖拽
+                delay: 200,                // 必须按住 200ms 才开始拖拽
+                delayOnTouchOnly: true,    // 只在触摸屏上启用延迟，不影响鼠标手感
+                touchStartThreshold: 5,    // 允许 5px 的手指抖动，防止轻微晃动导致点击失效
+                onEnd: (evt) => {
+                    const newLinks = [];
+                    const items = evt.from.children;
+                    for (let i = 0; i < items.length; i++) {
+                        const name = items[i].querySelector('.pop-text').innerText;
+                        const link = g.links.find(l => l.name === name);
+                        if (link) newLinks.push(link);
+                    }
+                    g.links = newLinks;
+                    saveData();
+                }
+            });
+        }
+    }
+
+    // --- 4. 搜索功能 (Point 4) ---
+    els.engineSelect.onchange = () => localStorage.setItem('nav_pro_engine', els.engineSelect.value);
+    
+    els.searchInput.oninput = (e) => {
+        const kw = e.target.value.trim().toLowerCase();
+        if (!kw) { els.searchHints.style.display = 'none'; return; }
+        
+        let res = [];
+        bData.forEach(g => g.links.forEach(l => { 
+            if (l.name.toLowerCase().includes(kw) || l.url.includes(kw)) res.push(l); 
+        }));
+        
+        if (res.length > 0) {
+            els.searchHints.innerHTML = res.slice(0, 8).map(l => `
+                <div style="display:flex; align-items:center; padding:8px; cursor:pointer; border-radius:8px;" 
+                     class="menu-item" onclick="window.open('${l.url}','_blank')">
+                    <img src="${l.icon}" style="width:24px; height:24px; border-radius:50%; margin-right:10px;">
+                    <span style="font-size:14px; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.name}</span>
+                </div>
+            `).join('');
+            els.searchHints.style.display = 'grid';
+        } else {
+            els.searchHints.style.display = 'none';
+        }
+    };
+    
+    els.searchInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            if (els.searchInput.value) {
+                window.open(els.engineSelect.value + encodeURIComponent(els.searchInput.value), '_blank');
+            }
+            els.searchHints.style.display = 'none';
+        }
+    };
+
+    // --- 6. 书签导入 (Point 6 - 重写) ---
+    // 递归遍历 DOM 树提取链接
+    function traverseBookmarks(element, currentGroup, results) {
+        const children = Array.from(element.children);
+        
+        children.forEach(child => {
+            const tagName = child.tagName.toUpperCase();
+            
+            if (tagName === 'H3') {
+                // 发现新分组
+                currentGroup = {
+                    group: child.textContent.trim() || '未命名',
+                    links: [],
+                    customIcon: null
+                };
+                results.push(currentGroup);
+            } 
+            else if (tagName === 'A') {
+                // 发现链接
+                if (currentGroup) {
+                    let icon = child.getAttribute('icon');
+                    if(!icon) {
+                        try {
+                            const u = new URL(child.href);
+                            icon = `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`;
+                        } catch(e) { icon = ''; }
+                    }
+                    currentGroup.links.push({
+                        name: child.textContent.trim(),
+                        url: child.href,
+                        icon: icon
+                    });
+                }
+            } 
+            else if (tagName === 'DL' || tagName === 'DT' || tagName === 'P') {
+                // 继续深入
+                traverseBookmarks(child, currentGroup, results);
+            }
+        });
+    }
+
+    document.getElementById('fileInput').onchange = (e) => {
+        if (!e.target.files.length) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(ev.target.result, 'text/html');
+            const results = [];
+        
+            traverseBookmarks(doc.body, null, results);
+        
+            // 过滤空分组
+            let validGroups = results.filter(g => g.links.length > 0);
+
+            if (validGroups.length > 0) {
+                let addedGroupCount = 0;
+                let addedLinkCount = 0;
+
+                validGroups.forEach(newGroup => {
+                    // 检查 bData 是否已有同名分组
+                    const existingGroup = bData.find(g => g.group === newGroup.group);
+                
+                    if (existingGroup) {
+                        // 分组存在，追加新链接（去重 URL）
+                        newGroup.links.forEach(l => {
+                            if (!existingGroup.links.some(el => el.url === l.url)) {
+                                existingGroup.links.push(l);
+                                addedLinkCount++;
+                            }
+                        });
+                    } else {
+                        // 新分组，直接添加
+                        bData.push(newGroup);
+                        addedGroupCount++;
+                        addedLinkCount += newGroup.links.length;
+                    }
+                });
+
+                saveData();
+                renderMain();
+                showToast(`导入完成：新增 ${addedGroupCount} 个分组，新增 ${addedLinkCount} 个链接`);
+            } else {
+                alert('未找到有效书签，请确认文件格式。');
+            }
+        };
+        reader.readAsText(e.target.files[0]);
+        e.target.value = '';
+    };
+
+
+    // --- 5. 配置导入导出 (Point 5) ---
+    function exportConfig() {
+        const config = {
+            version: "3.0",
+            data: bData,
+            bg: localStorage.getItem('nav_pro_bg'),
+            engine: els.engineSelect.value
+        };
+        const blob = new Blob([JSON.stringify(config)], {type: "application/json"});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Minimalist_Config_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    document.getElementById('configInput').onchange = (e) => {
+        if (!e.target.files.length) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const c = JSON.parse(ev.target.result);
+                if (c.data && Array.isArray(c.data)) {
+                    if(confirm("导入将覆盖当前所有数据，确定吗？")) {
+                        bData = c.data;
+                        if(c.bg) {
+                            localStorage.setItem('nav_pro_bg', c.bg);
+                            document.body.style.backgroundImage = `url(${c.bg})`;
+                        }
+                        if(c.engine) {
+                            localStorage.setItem('nav_pro_engine', c.engine);
+                            els.engineSelect.value = c.engine;
+                        }
+                        saveData();
+                        renderMain();
+                        showToast("配置还原成功");
+                    }
+                } else {
+                    alert("配置文件格式错误");
+                }
+            } catch(err) { alert("文件解析失败"); }
+        };
+        reader.readAsText(e.target.files[0]);
+        e.target.value = '';
+    };
+
+    // 背景图(限制 1MB)
+    document.getElementById('bgInput').onchange = (e) => {
+        if (!e.target.files.length) return;
+        const file = e.target.files[0];
+        const maxBgSize = 1024 * 1024; // 1MB
+        if (file.size > maxBgSize) {
+            alert(`背景图太大了！当前大小：${(file.size / 1024 / 1024).toFixed(1)}MB，请压缩至 1MB 以内，否则浏览器可能无法保存您的设置。`);
+            e.target.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            document.body.style.backgroundImage = `url(${ev.target.result})`;
+            localStorage.setItem('nav_pro_bg', ev.target.result); // 这里保存了大图
+            showToast("壁纸设置成功");
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // --- 辅助函数 ---
+    function saveData() {
+        try {
+            localStorage.setItem('nav_elite_data', JSON.stringify(bData));
+        } catch(e) {
+            alert("数据过大(图片过多)，可能无法保存到本地缓存，建议导出配置文件备份。");
+        }
+    }
+
+    function updateOrder() {
+        if (!bData || bData.length === 0) return;
+        const newData = [];
+        // 按照拖拽后的 DOM 顺序重新抓取数据
+        const nodes = els.mainGrid.querySelectorAll('.group-node');
+        nodes.forEach(node => {
+            const idx = node.getAttribute('data-idx');
+            if (idx !== null) {
+                newData.push(bData[parseInt(idx)]);
+            }
+        });
+        // 更新数据并重新渲染一次（重置 data-idx）
+        bData = newData;
+        saveData();
+        renderMain();
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.opacity = '1';
+        setTimeout(() => t.style.opacity = '0', 2000);
+    }
+    
+    // --- 自动化数据加载逻辑 ---
+    async function initDataPipeline() {
+        // 优先级 1: 读取浏览器缓存 (LocalStorage)
+        const stored = localStorage.getItem('nav_elite_data');
+        if (stored) {
+            try { 
+                bData = JSON.parse(stored); 
+                console.log("✅ 存在缓存：从本地缓存加载数据");
+                return; // 命中缓存，直接跳出，不再读取原始文件
+            } catch(e) { console.error("解析缓存失败:", e); }
+        }
+        // 优先级 2: 尝试加载 JSON 配置文件
+        const jsonPath = 'data/Minimalist_Config.json';
+        try {
+            const response = await fetch(jsonPath);
+            if (response.ok) {
+                const config = await response.json();
+                if (config.data) {
+                    bData = config.data;
+                    if (config.engine) els.engineSelect.value = config.engine;
+                    console.log("✅ 首次启动：从 JSON 自动导入数据");
+                    return; // 成功则跳出
+                }
+            }
+        } catch (e) { console.warn("未找到 JSON 配置文件或解析失败"); }
+
+        // 优先级 3: 尝试加载 Chrome 书签 HTML
+        const htmlPath = 'data/bookmarks.html';
+        try {
+            const response = await fetch(htmlPath);
+            if (response.ok) {
+                const htmlText = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+                const results = [];
+                traverseBookmarks(doc.body, null, results);
+                let validGroups = results.filter(g => g.links.length > 0);
+                if (validGroups.length > 0) {
+                    bData = validGroups; // 覆盖初始数据
+                    console.log("✅ 首次启动：从 HTML 自动导入书签");
+                    return;
+                }
+            }
+        } catch (e) { console.warn("未找到书签 HTML 文件"); }
+    }
+
+    // 自动加载背景图
+    function tryLoadBackground() {
+        // 优先级 1: 先看缓存里有没有手动设置过的壁纸 (Base64)
+        const cachedBg = localStorage.getItem('nav_pro_bg');
+        if (cachedBg) {
+            document.body.style.backgroundImage = `url(${cachedBg})`;
+            console.log("✅ 使用手动设置的个性化壁纸");
+            return;
+        }
+
+        // 优先级 2: 如果没有手动设置，加载 data 文件夹里的默认背景
+        const bgPath = 'data/Background.jpg';
+        // 先检查 data 目录下是否有图
+        const img = new Image();
+        img.src = bgPath;
+        img.onload = () => {
+            document.body.style.backgroundImage = `url(${bgPath})`;
+            console.log("✅ 成功加载本地背景图");
+        };
+        img.onerror = () => {
+            console.log("ℹ️ 未发现默认壁纸，使用 CSS 默认底色");
+        };
+    }
+</script>
+</body>
+</html>
