@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "极简网址导航",
+  "version": "1.0",
+  "description": "用极简导航替代 Chrome 默认新标签页，支持快速添加当前网页。",
+  "action": {
+    "default_title": "添加到极简导航",
+    "default_popup": "popup.html"
+  },
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "unlimitedStorage"
+  ],
+  "icons": {
+    "128": "icon.png"
+  }
+}

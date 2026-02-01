@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --accent: #6c5ce7;
+            --text-dark: #2d3436;
+            --bg: #f5f6fa;
+        }
+        body {
+            width: 340px;
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-dark);
+            overflow: hidden; /* 防止出现双滚动条 */
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        h3 { margin: 0 0 10px 0; font-size: 18px; text-align: center; color: var(--accent); }
+        
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 12px; font-weight: bold; color: #636e72; }
+        
+        input, select {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid #dfe6e9;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            background: white;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent); }
+
+        /* 解决下拉框被遮挡的关键：body 留白或让 select 向上弹出 */
+        /* 在 Chrome 扩展中，通常增加底部 padding 是最稳妥的 */
+        .wrapper { padding-bottom: 30px; } 
+
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button {
+            flex: 1;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        #saveBtn { background: var(--accent); color: white; }
+        #saveBtn:hover { background: #5b4cc4; opacity: 0.9; }
+        #cancelBtn { background: #dfe6e9; color: #636e72; }
+
+        #newGroupInput { display: none; border: 1px dashed var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <h3>添加到导航</h3>
+        <div class="container">
+            <div class="field">
+                <label>名称</label>
+                <input type="text" id="title" placeholder="网页标题">
+            </div>
+            <div class="field">
+                <label>网址</label>
+                <input type="text" id="url" placeholder="https://...">
+            </div>
+            <div class="field">
+                <label>保存至分组</label>
+                <select id="groupSelect"></select>
+                <input type="text" id="newGroupInput" placeholder="输入新分组名称...">
+            </div>
+            <div class="btn-group">
+                <button id="cancelBtn">取消</button>
+                <button id="saveBtn">立即保存</button>
+            </div>
+        </div>
+    </div>
+    <script src="js/store.js"></script>
+    <script src="js/popup.js"></script>
+</body>
+</html>
