@@ -44,9 +44,9 @@
             transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
-        /* 4. 搜索框优化 */
+        /* 4. 查找框优化 */
         .search-section { 
-            width: 700px; /* 搜索框容器宽度 */
+            width: 700px; /* 查找框容器宽度 */
             z-index: 2000; 
             margin-bottom: 60px; 
             position: relative; 
@@ -56,7 +56,7 @@
             display: flex; 
             background: rgba(255,255,255,0.95); 
             border-radius: 35px; 
-            padding: 6px; /* 搜索框外框高度 */
+            padding: 6px; /* 查找框外框高度 */
             box-shadow: var(--shadow); 
             align-items: center; 
             backdrop-filter: blur(10px);
@@ -64,7 +64,7 @@
         }
         .search-container:hover { transform: scale(1.02); }
         
-        .engine-select { 
+        .search-select { 
             border: none; 
             background: rgba(0,0,0,0.06); 
             padding: 10px 15px; 
@@ -74,19 +74,19 @@
             outline: none; 
             font-weight: bold;
             color: #444;
-            width: 140px; /* 控制搜索框下拉框宽度 */
+            width: 140px; /* 控制查找框下拉框宽度 */
             text-align-last: center; 
             font-size: 14px;
             -webkit-appearance: none;
         }
-        .engine-select:hover { background: rgba(0,0,0,0.1); }
-        .engine-select option { text-align: left; padding: 5px; }
+        .search-select:hover { background: rgba(0,0,0,0.1); }
+        .search-select option { text-align: left; padding: 5px; }
 
         .search-container input { 
             flex: 1; 
             border: none; 
             background: transparent; 
-            padding: 8px; /* 搜索框内部输入框高度 */
+            padding: 8px; /* 查找框内部输入框高度 */
             font-size: 12px; /* 字体大小 */
             outline: none; 
             color: #333;
@@ -277,15 +277,7 @@
     <div id="zoomWrapper">
         <div class="search-section">
             <div class="search-container">
-                <select class="engine-select" id="engineSelect">
-                    <option value="https://www.google.com/search?q=">Google</option>
-                    <option value="https://translate.google.com/?sl=auto&tl=zh-CN&text=">翻译成中文</option>
-                    <option value="https://translate.google.com/?sl=auto&tl=en&text=">翻译成英语</option>
-                    <option value="https://www.bing.com/search?q=">Bing</option>
-                    <option value="https://yandex.com/search/?text=">Yandex</option>
-                    <option value="https://duckduckgo.com/?q=">DuckDuckGo</option>
-                </select>
-                <input type="text" id="searchInput" placeholder="搜索网络或书签..." autocomplete="off">
+                <input type="text" id="searchInput" placeholder="查找书签或网页..." autocomplete="off">
             </div>
             <div id="searchHints"></div>
         </div>

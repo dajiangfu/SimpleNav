@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "极简网址导航",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "一个简洁的新标签页导航扩展，用于集中管理和快速访问常用网站。提供可视化分组、快捷入口和高效的起始页体验，帮助用户在打开新标签页时更快进入常用工作与学习资源。",
   "action": {
     "default_title": "添加到极简导航",
@@ -13,7 +13,8 @@
   "permissions": [
     "storage",
     "tabs",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "search"
   ],
   "icons": {
     "128": "icon.png"

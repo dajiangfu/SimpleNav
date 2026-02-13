@@ -20,7 +20,7 @@
         contextMenu: document.getElementById('contextMenu'),
         searchInput: document.getElementById('searchInput'),
         searchHints: document.getElementById('searchHints'),
-        engineSelect: document.getElementById('engineSelect'),
+        // searchSelect: document.getElementById('searchSelect'),
         toast: document.getElementById('toast')
     };
     
@@ -739,8 +739,8 @@
         }
     }
 
-    // --- 4. 搜索功能 (Point 4) ---
-    els.engineSelect.onchange = () => Store.set('nav_pro_engine', els.engineSelect.value);
+    // --- 4. 快速查找（本地匹配 + 默认搜索） ---
+    // els.searchSelect.onchange = () => Store.set('nav_pro_search', els.searchSelect.value);
     
     els.searchInput.oninput = (e) => {
         const kw = e.target.value.trim().toLowerCase();
@@ -767,13 +767,20 @@
     els.searchInput.onkeydown = (e) => {
         if (e.key === 'Enter') {
             if (els.searchInput.value) {
-                window.open(els.engineSelect.value + encodeURIComponent(els.searchInput.value), '_blank');
+                const q = els.searchInput.value.trim();
+                if (!q) return;
+                if (chrome?.search?.query) {
+                    chrome.search.query({ text: q, disposition: 'NEW_TAB' });
+                } else {
+                    window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank');
+                }
+                // window.open(els.searchSelect.value + encodeURIComponent(els.searchInput.value), '_blank');
             }
             els.searchHints.style.display = 'none';
         }
     };
 
-    // --- 6. 书签导入 (Point 6 - 重写) ---
+    // --- 5. 书签导入 (Point 5 - 重写) ---
     // 递归遍历 DOM 树提取链接
     function traverseBookmarks(element, currentGroup, results) {
         const children = Array.from(element.children);
@@ -863,13 +870,13 @@
     };
 
 
-    // --- 5. 配置导入导出 (Point 5) ---
-    function exportConfig() {
+    // --- 6. 配置导入导出 (Point 6) ---
+    async function exportConfig() {
         const config = {
             version: "3.0",
             data: bData,
-            bg: localStorage.getItem('nav_pro_bg'),
-            engine: els.engineSelect.value
+            bg: await Store.get('nav_pro_bg')
+            // search: els.searchSelect.value
         };
         const blob = new Blob([JSON.stringify(config)], {type: "application/json"});
         const a = document.createElement('a');
@@ -881,20 +888,20 @@
     document.getElementById('configInput').onchange = (e) => {
         if (!e.target.files.length) return;
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
             try {
                 const c = JSON.parse(ev.target.result);
                 if (c.data && Array.isArray(c.data)) {
                     if(confirm("导入将覆盖当前所有数据，确定吗？")) {
                         bData = c.data;
                         if(c.bg) {
-                            localStorage.setItem('nav_pro_bg', c.bg);
+                            await Store.set('nav_pro_bg', c.bg);
                             document.body.style.backgroundImage = `url(${c.bg})`;
                         }
-                        if(c.engine) {
-                            localStorage.setItem('nav_pro_engine', c.engine);
-                            els.engineSelect.value = c.engine;
-                        }
+                        // if(c.search) {
+                        //     await Store.set('nav_pro_search', c.search);
+                        //     els.searchSelect.value = c.search;
+                        // }
                         scheduleSaveData();
                         scheduleRenderMain();
                         showToast("配置还原成功");
@@ -964,16 +971,15 @@
     async function initDataPipeline() {
         // 优先级 1: 读取存储 (使用通用 Store)
         const stored = await Store.get('nav_elite_data'); // 使用 await Store.get
-        if (stored) {
+        if (stored !== null) {
             try { 
                 // Store.get 已经帮我们做了解析，这里直接赋值
                 bData = stored; 
                 console.log("✅ 存在缓存：从存储加载数据");
-                // 从本地读取已保存的引擎偏好
-                const savedEngine = await Store.get('nav_pro_engine');
-                if (savedEngine) {
-                    els.engineSelect.value = savedEngine;
-                }
+                // const savedEngine = await Store.get('nav_pro_search');
+                // if (savedEngine) {
+                //     els.searchSelect.value = savedEngine;
+                // }
                 return; // 命中缓存，直接跳出，不再读取原始文件
             } catch(e) { console.error("解析缓存失败:", e); }
         }
@@ -985,8 +991,10 @@
                 const config = await response.json();
                 if (config.data) {
                     bData = config.data;
-                    if (config.engine) els.engineSelect.value = config.engine;
+                    // if (config.search) els.searchSelect.value = config.search;
                     console.log("✅ 首次启动：从 JSON 自动导入数据");
+                    // 立刻落盘，避免每次刷新都“首次启动”
+                    try { await Store.set('nav_elite_data', bData); } catch(e) {}
                     return; // 成功则跳出
                 }
             }
@@ -1002,14 +1010,19 @@
                 const doc = parser.parseFromString(htmlText, 'text/html');
                 const results = [];
                 traverseBookmarks(doc.body, null, results);
-                let validGroups = results.filter(g => g.links.length > 0);
+                const validGroups = results.filter(g => g.links.length > 0);
                 if (validGroups.length > 0) {
                     bData = validGroups; // 覆盖初始数据
                     console.log("✅ 首次启动：从 HTML 自动导入书签");
+                    // 立刻落盘，避免每次刷新都“首次启动”
+                    try { await Store.set('nav_elite_data', bData); } catch(e) {}
                     return;
                 }
             }
         } catch (e) { console.warn("未找到书签 HTML 文件"); }
+        
+        // 如果三种都失败，保证 bData 是数组
+        bData = [];
     }
 
     // 自动加载背景图
